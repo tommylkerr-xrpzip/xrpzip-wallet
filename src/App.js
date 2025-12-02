@@ -104,9 +104,9 @@ const XRPZipWallet = () => {
     setTxStatus('Copied!');
   };
 
-  const sendXRP = async () => {
-    if (!wallet || !sendAmount || !recipient) {
-      setTxStatus('Fill all fields');
+   const sendXRP = async () => {
+    if (!active || !sendAmount || !recipient) {
+      setTxStatus('Fill amount & recipient');
       return;
     }
 
@@ -115,20 +115,28 @@ const XRPZipWallet = () => {
 
       const prepared = await client.autofill({
         TransactionType: 'Payment',
-        Account: wallet.classicAddress,
+        Account: active.classicAddress,
         Amount: xrpl.xrpToDrops(sendAmount),
         Destination: recipient,
       });
 
-      const signed = wallet.sign(prepared);
+      // ← THIS IS THE FIXED LINE
+      const signed = xrpl.Wallet.fromSeed(active.seed).sign(prepared);
+
       await client.submitAndWait(signed.tx_blob);
 
-      setTxStatus(`Success! Sent ${sendAmount} XRP`);
-      setSendAmount('');
-      setRecipient('');
-      getBalance(wallet.classicAddress);
-      getTransactions(wallet.classicAddress);
+      const duration = (Date.now() - performance.now()) / 1000;
+      setZipSpeed(duration.toFixed(2));
+      setTxStatus(`Success! Sent ${sendAmount} XRP in ${duration.toFixed(2)}s`);
+
+      if (chartRef.current) {
+        chartRef.current.data.datasets[0].data = [duration, 5 - duration];
+        chartRef.current.update();
+      }
+
+      refreshAll();
     } catch (err) {
+      console.error(err);
       setTxStatus('Failed: ' + (err.message || 'Check recipient'));
     }
   };
