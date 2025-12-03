@@ -4,10 +4,8 @@ import { motion } from 'framer-motion';
 import Chart from 'chart.js/auto';
 import { QRCodeCanvas } from 'qrcode.react';
 
-const TABS = ['Dashboard', 'Receive', 'Send', 'History', 'RWA', 'NFT', 'BUY/SELL Crypto', 'NEWS'];
-
 const XRPZipWallet = () => {
-  const [activeTab, setActiveTab] = useState('Dashboard');
+  const [hasWallet, setHasWallet] = useState(false);
   const [wallet, setWallet] = useState(null);
   const [balance, setBalance] = useState(0);
   const [xrpPrice, setXrpPrice] = useState(2.17);
@@ -15,8 +13,6 @@ const XRPZipWallet = () => {
   const [sendAmount, setSendAmount] = useState('');
   const [recipient, setRecipient] = useState('');
   const [seedInput, setSeedInput] = useState('');
-  const [transactions, setTransactions] = useState([]);
-  const [firstVisit, setFirstVisit] = useState(true);
   const [showSeedModal, setShowSeedModal] = useState(false);
   const [generatedSeed, setGeneratedSeed] = useState('');
 
@@ -26,36 +22,15 @@ const XRPZipWallet = () => {
   const ROYAL_BLUE = '#002366';
   const GOLD = '#FFD700';
 
-  // Load wallet & first visit
+  // Load wallet on first visit
   useEffect(() => {
     const stored = localStorage.getItem('xrpzip-wallet');
-    const visited = localStorage.getItem('xrpzip-visited');
     if (stored) {
       const w = JSON.parse(stored);
       setWallet(w);
+      setHasWallet(true);
       getBalance(w.classicAddress);
-      getTransactions(w.classicAddress);
     }
-    if (visited) setFirstVisit(false);
-  }, []);
-
-  // Save wallet
-  useEffect(() => {
-    if (wallet) localStorage.setItem('xrpzip-wallet', JSON.stringify(wallet));
-  }, [wallet]);
-
-  // Live XRP price
-  useEffect(() => {
-    const fetchPrice = async () => {
-      try {
-        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd');
-        const data = await res.json();
-        setXrpPrice(data.ripple.usd);
-      } catch (e) { }
-    };
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const getClient = async () => {
@@ -74,139 +49,102 @@ const XRPZipWallet = () => {
     }
   };
 
-  const getTransactions = async (addr) => {
-    const client = await getClient();
-    try {
-      const res = await client.request({ command: 'account_tx', account: addr, limit: 10 });
-      setTransactions(res.result.transactions || []);
-    } catch (err) {
-      setTransactions([]);
-    }
-  };
-
   const generateWallet = () => {
     const w = xrpl.Wallet.generate();
     setWallet(w);
     localStorage.setItem('xrpzip-wallet', JSON.stringify(w));
     setGeneratedSeed(w.seed);
     setShowSeedModal(true);
-    setFirstVisit(false);
-    localStorage.setItem('xrpzip-visited', 'true');
+    setHasWallet(true);
   };
 
   const importWallet = () => {
-    if (!seedInput.trim()) return alert('Paste your seed');
+    if (!seedInput.trim()) return alert('Enter seed');
     try {
       const w = xrpl.Wallet.fromSeed(seedInput.trim());
       setWallet(w);
       localStorage.setItem('xrpzip-wallet', JSON.stringify(w));
       setSeedInput('');
+      setHasWallet(true);
       getBalance(w.classicAddress);
-      getTransactions(w.classicAddress);
-      setFirstVisit(false);
-      localStorage.setItem('xrpzip-visited', 'true');
     } catch (e) {
       alert('Invalid seed');
     }
   };
 
-  const copyToClipboard = (text) => {
+  const copy = (text) => {
     navigator.clipboard.writeText(text);
     setTxStatus('Copied!');
   };
 
-  // FINAL FIX: Recreate wallet from seed every time we sign
-  const sendXRP = async () => {
-    if (!wallet || !sendAmount || !recipient) {
-      setTxStatus('Fill all fields');
-      return;
-    }
-
-    try {
-      const client = await getClient();
-
-      // ← THIS LINE FIXES EVERYTHING IN PRODUCTION
-      const freshWallet = xrpl.Wallet.fromSeed(wallet.seed);
-
-      const prepared = await client.autofill({
-        TransactionType: 'Payment',
-        Account: wallet.classicAddress,
-        Amount: xrpl.xrpToDrops(sendAmount),
-        Destination: recipient,
-      });
-
-      const signed = freshWallet.sign(prepared);
-      await client.submitAndWait(signed.tx_blob);
-
-      const duration = (Date.now() - performance.now()) / 1000;
-      setZipSpeed(duration.toFixed(2));
-      setTxStatus(`Success! Sent ${sendAmount} XRP in ${duration.toFixed(2)}s`);
-
-      if (chartRef.current) {
-        chartRef.current.data.datasets[0].data = [duration, 5 - duration];
-        chartRef.current.update();
-      }
-
-      getBalance(wallet.classicAddress);
-      getTransactions(wallet.classicAddress);
-    } catch (err) {
-      setTxStatus('Failed: ' + (err.message || 'Check recipient'));
-    }
-  };
-
-  // Chart
-  useEffect(() => {
-    if (!wallet) return;
-    if (chartRef.current) chartRef.current.destroy();
-
-    const canvas = document.getElementById('zipMeter');
-    if (!canvas) return;
-
-    chartRef.current = new Chart(canvas, {
-      type: 'doughnut',
-      data: { datasets: [{ data: [0, 5], backgroundColor: ['#00ff00', '#222'] }] },
-      options: { cutout: '85%', rotation: -90, circumference: 180, plugins: { legend: false, tooltip: false } }
-    });
-
-    return () => chartRef.current?.destroy();
-  }, [wallet]);
-
-  // First Visit Modal
-  if (firstVisit && !wallet) {
+  // ──────── LANDING PAGE (first visit) ────────
+  if (!hasWallet) {
     return (
       <div style={{ background: ROYAL_BLUE, color: 'white', minHeight: '100vh', textAlign: 'center', paddingTop: '10%' }}>
-        <motion.h1 initial={{ scale: 0.8 }} animate={{ scale: 1 }} style={{ fontSize: '6rem', color: GOLD }}>
-          Welcome to XRPZip
+        <motion.h1 style={{ fontSize: '7rem', color: GOLD, marginBottom: '40px' }}>
+          XRPZip
         </motion.h1>
-        <p style={{ fontSize: '1.8rem', maxWidth: '800px', margin: '40px auto', lineHeight: '1.6' }}>
-          The fastest XRPL wallet for XRP, NFTs, and real-world assets.<br />
-          Send XRP in under 5 seconds. Own fractions of real estate, gold, and art.
+
+        <p style={{ fontSize: '2.2rem', maxWidth: '900px', margin: '0 auto 50px', lineHeight: 1.6 }}>
+          The fastest, most beautiful XRPL wallet.<br />
+          Send XRP in under 5 seconds • Own NFTs • Trade real-world assets
         </p>
-        <button onClick={generateWallet} style={{ background: GOLD, color: ROYAL_BLUE, padding: '20px 50px', fontSize: '1.8rem', borderRadius: '15px', margin: '30px' }}>
+
+        <button
+          onClick={generateWallet}
+          style={{ background: GOLD, color: ROYAL_BLUE, padding: '20px 60px', fontSize: '2rem', borderRadius: '20px', margin: '20px', fontWeight: 'bold' }}
+        >
           Create Your Wallet
         </button>
+
+        <div style={{ marginTop: '60px' }}>
+          <p style={{ fontSize: '1.5rem', color: '#ccc' }}>Already have a wallet?</p>
+          <input
+            style={{ width: '500px', padding: '15px', margin: '20px', fontSize: '1.3rem', borderRadius: '12px', border: `2px solid ${GOLD}` }}
+            placeholder="Paste your seed phrase to import"
+            value={seedInput}
+            onChange={e => setSeedInput(e.target.value)}
+          />
+          <br />
+          <button
+            onClick={importWallet}
+            style={{ background: 'transparent', color: GOLD, padding: '15px 40px', fontSize: '1.5rem', border: `3px solid ${GOLD}`, borderRadius: '15px' }}
+          >
+            Import Wallet
+          </button>
+        </div>
       </div>
     );
   }
 
-  // Seed Backup Modal
+  // ──────── SEED BACKUP MODAL ────────
   if (showSeedModal) {
     return (
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} style={{ background: ROYAL_BLUE, padding: '50px', borderRadius: '25px', border: `5px solid ${GOLD}`, maxWidth: '600px', textAlign: 'center' }}>
-          <h2 style={{ color: GOLD, fontSize: '2.5rem' }}>Wallet Created!</h2>
-          <p style={{ color: '#ff6b6b', fontSize: '1.4rem', margin: '20px 0' }}>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+        <motion.div
+          initial={{ scale: 0.8 }}
+          animate={{ scale: 1 }}
+          style={{ background: ROYAL_BLUE, padding: '60px', borderRadius: '30px', border: `6px solid ${GOLD}`, maxWidth: '700px', textAlign: 'center' }}
+        >
+          <h2 style={{ color: GOLD, fontSize: '3rem', marginBottom: '30px' }}>Wallet Created!</h2>
+          <p style={{ color: '#ff4444', fontSize: '1.8rem', marginBottom: '30px' }}>
             BACKUP YOUR SEED PHRASE NOW
           </p>
-          <code style={{ background: '#001133', padding: '20px', borderRadius: '12px', fontSize: '1.3rem', wordBreak: 'break-all', display: 'block', margin: '20px 0' }}>
+          <div style={{ background: '#001133', padding: '25px', borderRadius: '15px', margin: '30px 0', fontSize: '1.5rem', wordBreak: 'break-all', display: 'block' }}>
             {generatedSeed}
-          </code>
+          </div>
           <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
-            <button onClick={() => copyToClipboard(generatedSeed)} style={{ background: GOLD, color: ROYAL_BLUE, padding: '15px 30px', borderRadius: '12px' }}>
+            <button
+              onClick={() => copy(generatedSeed)}
+              style={{ background: GOLD, color: ROYAL_BLUE, padding: '15px 30px', borderRadius: '12px', fontWeight: 'bold' }}
+            >
               Copy Seed
             </button>
-            <button onClick={() => setShowSeedModal(false)} style={{ background: 'transparent', color: 'white', padding: '15px 30px', border: `2px solid ${GOLD}`, borderRadius: '12px' }}>
-              I’ve Backed It Up
+            <button
+              onClick={() => setShowSeedModal(false)}
+              style={{ background: 'transparent', color: 'white', padding: '15px 30px', border: `3px solid ${GOLD}`, borderRadius: '12px' }}
+            >
+              I’ve Saved It
             </button>
           </div>
         </motion.div>
@@ -214,10 +152,16 @@ const XRPZipWallet = () => {
     );
   }
 
+  // ──────── MAIN WALLET UI (after wallet exists) ────────
   return (
     <div style={{ background: ROYAL_BLUE, color: 'white', minHeight: '100vh', fontFamily: 'Arial' }}>
-      {/* rest of your beautiful UI */}
-    {/* ... all your tabs, etc. */}
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <h1 style={{ color: GOLD, fontSize: '4rem' }}>XRPZip</h1>
+        <p>Balance: {balance.toFixed(6)} XRP</p>
+        <p>≈ ${(balance * xrpPrice).toFixed(2)} USD</p>
+        <button onClick={() => getBalance(wallet.classicAddress)}>Refresh Balance</button>
+        {/* Add your Send, Receive, History tabs here later */}
+      </div>
     </div>
   );
 };
