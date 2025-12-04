@@ -25,7 +25,7 @@ const XRPZipWallet = () => {
   const ROYAL_BLUE = '#002366';
   const GOLD = '#FFD700';
 
-  // Load wallet on start
+  // Load wallet
   useEffect(() => {
     const stored = localStorage.getItem('xrpzip-wallet');
     if (stored) {
@@ -109,23 +109,32 @@ const XRPZipWallet = () => {
   };
 
   const sendXRP = async () => {
-    if (!wallet || !sendAmount || !recipient) return setTxStatus('Fill all fields');
+    if (!wallet || !sendAmount || !recipient) {
+      setTxStatus('Fill amount & recipient');
+      return;
+    }
+
     try {
       const client = await getClient();
-      const freshWallet = xrpl.Wallet.fromSeed(wallet.seed);
+      const freshWallet = xrpl.Wallet.fromSeed(wallet.seed); // ← fixes Edge issue
+
       const prepared = await client.autofill({
         TransactionType: 'Payment',
         Account: wallet.classicAddress,
         Amount: xrpl.xrpToDrops(sendAmount),
         Destination: recipient,
       });
+
       const signed = freshWallet.sign(prepared);
       await client.submitAndWait(signed.tx_blob);
+
       setTxStatus(`Success! Sent ${sendAmount} XRP`);
+      setSendAmount('');
+      setRecipient('');
       getBalance(wallet.classicAddress);
       getTransactions(wallet.classicAddress);
     } catch (err) {
-      setTxStatus('Failed: ' + (err.message || 'Error'));
+      setTxStatus('Failed: ' + (err.message || 'Check recipient'));
     }
   };
 
@@ -147,21 +156,16 @@ const XRPZipWallet = () => {
   if (!wallet) {
     return (
       <div style={{ background: ROYAL_BLUE, color: 'white', minHeight: '100vh', textAlign: 'center', paddingTop: '10%' }}>
-        <motion.h1 style={{ fontSize: '7rem', color: GOLD, marginBottom: '40px' }}>XRPZip</motion.h1>
-        <p style={{ fontSize: '2.2rem', maxWidth: '900px', margin: '0 auto 50px' }}>
+        <motion.h1 style={{ fontSize: '7rem', color: GOLD }}>XRPZip</motion.h1>
+        <p style={{ fontSize: '2.2rem', maxWidth: '900px', margin: '40px auto' }}>
           The fastest, most beautiful XRPL wallet
         </p>
         <button onClick={generateWallet} style={{ background: GOLD, color: ROYAL_BLUE, padding: '20px 60px', fontSize: '2rem', borderRadius: '20px' }}>
           Create Your Wallet
         </button>
         <div style={{ marginTop: '60px' }}>
-          <input
-            style={{ width: '500px', padding: '15px', margin: '20px' }}
-            placeholder="Or import existing wallet"
-            value={seedInput}
-            onChange={e => setSeedInput(e.target.value)}
-          />
-          <button onClick={importWallet} style={{ background: 'transparent', color: GOLD, padding: '15px 40px', border: '2px solid gold', borderRadius: '15px' }}>
+          <input placeholder="Import existing wallet" value={seedInput} onChange={e => setSeedInput(e.target.value)} style={{ width: '500px', padding: '15px' }} />
+          <button onClick={importWallet} style={{ background: 'transparent', color: GOLD, padding: '15px 40px', border: '2px solid gold', marginLeft: '20px' }}>
             Import
           </button>
         </div>
@@ -179,10 +183,10 @@ const XRPZipWallet = () => {
           <div style={{ background: '#001133', padding: '25px', borderRadius: '15px', margin: '30px 0', fontSize: '1.5rem', wordBreak: 'break-all' }}>
             {generatedSeed}
           </div>
-          <button onClick={() => copy(generatedSeed)} style={{ background: GOLD, color: ROYAL_BLUE, padding: '15px 30px', borderRadius: '12px' }}>
+          <button onClick={() => copy(generatedSeed)} style={{ background: GOLD, color: ROYAL_BLUE, padding: '15px 30px' }}>
             Copy Seed
           </button>
-          <button onClick={() => setShowSeedModal(false)} style={{ marginLeft: '20px', background: 'transparent', color: 'white', padding: '15px 30px', border: '2px solid gold', borderRadius: '12px' }}>
+          <button onClick={() => setShowSeedModal(false)} style={{ marginLeft: '20px', background: 'transparent', color: 'white', padding: '15px 30px', border: '2px solid gold' }}>
             I’ve Saved It
           </button>
         </motion.div>
@@ -190,7 +194,7 @@ const XRPZipWallet = () => {
     );
   }
 
-  // MAIN APP WITH TABS
+  // MAIN APP
   return (
     <div style={{ background: ROYAL_BLUE, color: 'white', minHeight: '100vh', fontFamily: 'Arial' }}>
       <div style={{ background: '#001133', padding: '15px', textAlign: 'center', borderBottom: '4px solid gold' }}>
@@ -213,7 +217,7 @@ const XRPZipWallet = () => {
         ))}
       </div>
 
-      {/* Dashboard */}
+      {/* DASHBOARD */}
       {activeTab === 'Dashboard' && (
         <div style={{ padding: '60px', textAlign: 'center' }}>
           <h1 style={{ fontSize: '6rem', color: GOLD }}>XRPZip</h1>
@@ -223,7 +227,82 @@ const XRPZipWallet = () => {
         </div>
       )}
 
-      {/* Add your other tabs here later — they will work the same way */}
+      {/* RECEIVE */}
+      {activeTab === 'Receive' && (
+        <div style={{ padding: '80px', textAlign: 'center' }}>
+          <h2 style={{ color: GOLD, fontSize: '3.5rem' }}>RECEIVE XRP</h2>
+          <QRCodeCanvas value={wallet.classicAddress} size={240} bgColor="#000" fgColor="#fff" />
+          <p style={{ margin: '40px 0', wordBreak: 'break-all', fontSize: '1.4rem' }}>{wallet.classicAddress}</p>
+          <button onClick={() => copy(wallet.classicAddress)} style={{ background: GOLD, color: ROYAL_BLUE, padding: '15px 40px' }}>
+            Copy Address
+          </button>
+        </div>
+      )}
+
+      {/* SEND */}
+      {activeTab === 'Send' && (
+        <div style={{ padding: '60px', maxWidth: '600px', margin: '0 auto' }}>
+          <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3.5rem' }}>SEND XRP</h2>
+          <input
+            placeholder="Recipient Address"
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+            style={{ width: '100%', padding: '16px', margin: '15px 0', background: '#001133', border: '2px solid gold', color: 'white', borderRadius: '12px' }}
+          />
+          <input
+            type="number"
+            placeholder="Amount in XRP"
+            value={sendAmount}
+            onChange={(e) => setSendAmount(e.target.value)}
+            style={{ width: '100%', padding: '16px', margin: '15px 0', background: '#001133', border: '2px solid gold', color: 'white', borderRadius: '12px' }}
+          />
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={sendXRP}
+            style={{
+              width: '100%',
+              background: GOLD,
+              color: ROYAL_BLUE,
+              padding: '20px',
+              fontSize: '1.8rem',
+              fontWeight: 'bold',
+              border: 'none',
+              borderRadius: '15px',
+              marginTop: '30px'
+            }}
+          >
+            SEND XRP
+          </motion.button>
+          <p style={{ marginTop: '30px', textAlign: 'center', fontSize: '1.4rem' }}>{txStatus}</p>
+        </div>
+      )}
+
+      {/* HISTORY */}
+      {activeTab === 'History' && (
+        <div style={{ padding: '40px' }}>
+          <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3rem' }}>TRANSACTION HISTORY</h2>
+          {transactions.length === 0 ? <p style={{ textAlign: 'center' }}>No transactions yet</p> : (
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+              {transactions.map((item, i) => {
+                const tx = item?.tx || {};
+                const amount = tx.Amount ? xrpl.dropsToXrp(tx.Amount) : '—';
+                return (
+                  <div key={i} style={{ background: '#001133', padding: '20px', margin: '10px 0', borderRadius: '15px', border: '1px solid gold' }}>
+                    <strong>{tx.TransactionType}</strong> — {amount} XRP → {tx.Destination?.slice(0,12)}...
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Placeholder tabs */}
+      {['RWA', 'NFT', 'BUY/SELL Crypto', 'NEWS'].includes(activeTab) && (
+        <div style={{ padding: '100px', textAlign: 'center', fontSize: '2.5rem', color: GOLD }}>
+          {activeTab} — Coming Soon
+        </div>
+      )}
     </div>
   );
 };
