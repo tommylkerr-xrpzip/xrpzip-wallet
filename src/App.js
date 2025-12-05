@@ -229,7 +229,7 @@ const XRPZipWallet = () => {
         </div>
       )}
 
-            {/* HISTORY — FINAL VERSION: SHOWS REAL TRANSACTIONS ONLY */}
+                {/* HISTORY — FINAL WORKING VERSION (shows received XRP correctly) */}
       {activeTab === 'History' && (
         <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
           <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3.5rem', marginBottom: '40px' }}>
@@ -238,36 +238,26 @@ const XRPZipWallet = () => {
 
           {transactions.length === 0 ? (
             <p style={{ textAlign: 'center', color: '#888', fontSize: '1.4rem' }}>
-              No transactions found
+              No transactions yet
             </p>
           ) : (
             transactions
-              .filter(item => {
-                const tx = item?.tx;
-                // Only show real Payment transactions (not OfferCreate, AccountSet, etc.)
-                if (tx?.TransactionType !== 'Payment') return false;
-                // If Amount is string → it's XRP drops → convert and show if > 0
-                if (typeof tx.Amount === 'string') {
-                  const xrp = parseFloat(xrpl.dropsToXrp(tx.Amount));
-                  return xrp > 0;
-                }
-                // If Amount is object → it's an issued currency (USDC, BTC, etc.) → show all
-                if (typeof tx.Amount === 'object' && tx.Amount?.value) {
-                  return parseFloat(tx.Amount.value) > 0;
-                }
-                return false;
-              })
+              .filter(item => item.tx?.TransactionType === 'Payment')
               .map((item, i) => {
                 const tx = item.tx;
+                const meta = item.meta;
                 const isSent = tx.Account === wallet.classicAddress;
-                let amountStr = '0 XRP';
-                let currency = 'XRP';
 
-                if (typeof tx.Amount === 'string') {
-                  amountStr = parseFloat(xrpl.dropsToXrp(tx.Amount)).toFixed(6) + ' XRP';
-                } else if (tx.Amount?.value) {
-                  amountStr = `${parseFloat(tx.Amount.value).toFixed(6)} ${tx.Amount.currency || 'IOU'}`;
-                  currency = tx.Amount.currency || 'IOU';
+                // Use DeliveredAmount for received payments (this was the missing piece!)
+                let rawAmount = isSent ? tx.Amount : meta.DeliveredAmount || tx.Amount;
+
+                let amountStr = '0 XRP';
+                if (rawAmount) {
+                  if (typeof rawAmount === 'string') {
+                    amountStr = parseFloat(xrpl.dropsToXrp(rawAmount)).toFixed(6) + ' XRP';
+                  } else if (rawAmount.value) {
+                    amountStr = `${parseFloat(rawAmount.value).toFixed(6)} ${rawAmount.currency || 'IOU'}`;
+                  }
                 }
 
                 const counterparty = isSent ? tx.Destination : tx.Account;
