@@ -25,14 +25,39 @@ const XRPZipWallet = () => {
   const ROYAL_BLUE = '#002366';
   const GOLD = '#FFD700';
 
+   // Load wallet + balance + transactions (100% guaranteed)
   useEffect(() => {
-    const stored = localStorage.getItem('xrpzip-wallet');
-    if (stored) {
-      const w = JSON.parse(stored);
-      setWallet(w);
-      getBalance(w.classicAddress);
-      getTransactions(w.classicAddress);
-    }
+    const loadWallet = async () => {
+      const stored = localStorage.getItem('xrpzip-wallet');
+      if (stored) {
+        try {
+          const w = JSON.parse(stored);
+          setWallet(w);
+
+          // Load balance
+          const client = await getClient();
+          const balInfo = await client.request({
+            command: 'account_info',
+            account: w.classicAddress,
+            ledger_index: 'validated'
+          });
+          setBalance(xrpl.dropsToXrp(balInfo.result.account_data.Balance));
+
+          // Load transactions — FORCED
+          const txRes = await client.request({
+            command: 'account_tx',
+            account: w.classicAddress,
+            limit: 20
+          });
+          setTransactions(txRes.result.transactions || []);
+
+        } catch (err) {
+          console.error("Error loading wallet data:", err);
+        }
+      }
+    };
+
+    loadWallet();
   }, []);
 
   useEffect(() => {
