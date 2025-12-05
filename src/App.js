@@ -220,124 +220,163 @@ const XRPZipWallet = () => {
         </div>
       )}
 
-            {activeTab === 'History' && (
-        <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
-          <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3.5rem', marginBottom: '40px' }}>
-            TRANSACTION HISTORY
-          </h2>
+              {/* HISTORY */} 
 
-          {transactions.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#888', fontSize: '1.4rem' }}>
-              No transactions yet — send or receive XRP to see them here
-            </p>
-          ) : (
-            transactions
-              .filter(item => {
-                const tx = item?.tx;
-                if (!tx) return false;
-                // Show all Payment, TrustSet, AccountSet (common on Testnet)
-                if (tx.TransactionType === 'Payment' || tx.TransactionType === 'TrustSet' || tx.TransactionType === 'AccountSet') {
-                  // For Payments, check if amount > 0
-                  if (tx.TransactionType === 'Payment') {
-                    const amount = tx.Amount || item.meta?.DeliveredAmount;
-                    if (typeof amount === 'string') {
-                      return parseFloat(xrpl.dropsToXrp(amount)) > 0;
-                    }
-                    if (amount?.value) {
-                      return parseFloat(amount.value) > 0;
-                    }
-                  }
-                  return true; // Show TrustSet/AccountSet
-                }
-                return false;
-              })
-              .map((item, i) => {
-                const tx = item.tx;
-                const meta = item.meta || {};
-                const isSent = tx.Account === wallet.classicAddress;
-                const txType = tx.TransactionType;
+      {activeTab === 'History' && ( 
 
-                // Get amount for Payments
-                let amountStr = '';
-                if (txType === 'Payment') {
-                  const rawAmount = isSent ? tx.Amount : (meta.DeliveredAmount || tx.Amount);
-                  if (typeof rawAmount === 'string') {
-                    amountStr = ` ${parseFloat(xrpl.dropsToXrp(rawAmount)).toFixed(6)} XRP`;
-                  } else if (rawAmount?.value) {
-                    amountStr = ` ${parseFloat(rawAmount.value).toFixed(6)} ${rawAmount.currency}`;
-                  }
-                }
+  <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}> 
 
-                const counterparty = isSent ? tx.Destination : tx.Account;
-                const hash = item.hash;
-                const date = new Date((item.date || Date.now() / 1000) * 1000).toLocaleString();
+    <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3.5rem', marginBottom: '40px' }}> 
 
-                // Type-specific label
-                let typeLabel = txType;
-                if (txType === 'Payment') typeLabel = isSent ? 'SENT' : 'RECEIVED';
-                else if (txType === 'TrustSet') typeLabel = 'TRUST LINE';
-                else if (txType === 'AccountSet') typeLabel = 'ACCOUNT UPDATE';
+      TRANSACTION HISTORY 
 
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    style={{
-                      background: '#001133',
-                      borderRadius: '20px',
-                      margin: '15px 0',
-                      border: '2px solid #333',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: '20px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        background: txType === 'Payment' ? (isSent ? 'rgba(255,51,102,0.1)' : 'rgba(0,255,153,0.1)') : 'rgba(255,215,0,0.1)'
-                      }}
-                      onClick={() => {
-                        const el = document.getElementById(`detail-${i}`);
-                        el.style.display = el.style.display === 'block' ? 'none' : 'block';
-                      }}
-                    >
-                      <div>
-                        <strong style={{ color: txType === 'Payment' ? (isSent ? '#ff3366' : '#00ff99') : GOLD, fontSize: '1.6rem' }}>
-                          {typeLabel} {amountStr}
-                        </strong>
-                        {txType === 'Payment' && (
-                          <br />
-                        )}
-                        <span style={{ color: '#aaa', fontSize: '1rem' }}>
-                          {counterparty ? `${isSent ? 'To' : 'From'}: ${counterparty.slice(0,12)}...${counterparty.slice(-8)}` : ''}
-                        </span>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ color: GOLD, fontSize: '1.2rem' }}>{date}</div>
-                        <div style={{ color: '#666', fontSize: '0.9rem' }}>Click for details</div>
-                      </div>
-                    </div>
+    </h2> 
 
-                    <div id={`detail-${i}`} style={{ display: 'none', padding: '20px', background: '#000822', borderTop: '1px solid #333' }}>
-                      <p><strong>Type:</strong> {txType}</p>
-                      <p><strong>Hash:</strong><br />
-                        <a href={`https://testnet.xrpl.org/transactions/${hash}`} target="_blank" rel="noopener noreferrer" style={{ color: GOLD }}>
-                          {hash}
-                        </a>
-                      </p>
-                      {amountStr && <p><strong>Amount:</strong> {amountStr}</p>}
-                      {counterparty && <p><strong>{isSent ? 'Recipient' : 'Sender'}:</strong> {counterparty}</p>
-                    </div>
-                  </motion.div>
-                );
-              })
-          )}
-        </div>
-      )}
+ 
+
+    {transactions.length === 0 ? ( 
+
+      <p style={{ textAlign: 'center', color: '#888', fontSize: '1.4rem' }}>No transactions yet</p> 
+
+    ) : ( 
+
+      transactions.map((item, i) => { 
+
+        const tx = item?.tx || {}; 
+
+        const meta = item?.meta || {}; 
+
+        const isSent = tx.Account === wallet.classicAddress; 
+
+        const amount = tx.Amount ? (typeof tx.Amount === 'string' ? xrpl.dropsToXrp(tx.Amount) : tx.Amount.value || '0') : '0'; 
+
+        const counterparty = isSent ? tx.Destination : tx.Account; 
+
+        const hash = item.hash; 
+
+        const date = new Date(item.date * 1000 || Date.now()).toLocaleString(); 
+
+ 
+
+        return ( 
+
+          <motion.div 
+
+            key={i} 
+
+            initial={{ opacity: 0, y: 20 }} 
+
+            animate={{ opacity: 1, y: 0 }} 
+
+            style={{ 
+
+              background: '#001133', 
+
+              borderRadius: '20px', 
+
+              margin: '15px 0', 
+
+              border: '2px solid #333', 
+
+              overflow: 'hidden' 
+
+            }} 
+
+          > 
+
+            {/* Summary Row */} 
+
+            <div 
+
+              style={{ 
+
+                padding: '20px', 
+
+                cursor: 'pointer', 
+
+                display: 'flex', 
+
+                justifyContent: 'space-between', 
+
+                alignItems: 'center', 
+
+                background: isSent ? 'rgba(255,51,102,0.1)' : 'rgba(0,255,153,0.1)' 
+
+              }} 
+
+              onClick={() => { 
+
+                const el = document.getElementById(`detail-${i}`); 
+
+                el.style.display = el.style.display === 'block' ? 'none' : 'block'; 
+
+              }} 
+
+            > 
+
+              <div> 
+
+                <strong style={{ color: isSent ? '#ff3366' : '#00ff99', fontSize: '1.6rem' }}> 
+
+                  {isSent ? 'SENT' : 'RECEIVED'} {parseFloat(amount).toFixed(6)} XRP 
+
+                </strong> 
+
+                <br /> 
+
+                <span style={{ color: '#aaa', fontSize: '1rem' }}> 
+
+                  {isSent ? 'To' : 'From'}: {counterparty?.slice(0, 12)}...{counterparty?.slice(-8)} 
+
+                </span> 
+
+              </div> 
+
+              <div style={{ textAlign: 'right' }}> 
+
+                <div style={{ color: GOLD, fontSize: '1.2rem' }}>{date}</div> 
+
+                <div style={{ color: '#666', fontSize: '0.9rem' }}>Click for details</div> 
+
+              </div> 
+
+            </div> 
+
+ 
+
+            {/* Expandable Details */} 
+
+            <div id={`detail-${i}`} style={{ display: 'none', padding: '20px', background: '#000822', borderTop: '1px solid #333' }}> 
+
+              <p><strong>Transaction Hash:</strong><br /> 
+
+                <a href={`https://testnet.xrpl.org/transactions/${hash}`} target="_blank" style={{ color: GOLD }}> 
+
+                  {hash} 
+
+                </a> 
+
+              </p> 
+
+              <p><strong>Full Amount:</strong> {amount} XRP</p> 
+
+              <p><strong>{isSent ? 'Recipient' : 'Sender'}:</strong> {counterparty}</p> 
+
+              <p><strong>Status:</strong> {meta.TransactionResult === 'tesSUCCESS' ? 'Success' : 'Failed'}</p> 
+
+            </div> 
+
+          </motion.div> 
+
+        ); 
+
+      }) 
+
+    )} 
+
+  </div> 
+
+)} 
 
       {['RWA', 'NFT', 'BUY/SELL Crypto', 'NEWS'].includes(activeTab) && (
         <div style={{ padding: '100px', textAlign: 'center', color: GOLD, fontSize: '3rem' }}>
