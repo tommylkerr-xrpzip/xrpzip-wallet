@@ -58,7 +58,7 @@ const XRPZipWallet = () => {
   const getTransactions = async (addr) => {
     const client = await getClient();
     try {
-      const res = await client.request({ command: 'account_tx', account: addr, limit: 15 });
+      const res = await client.request({ command: 'account_tx', account: addr, limit: 20 });
       setTransactions(res.result.transactions || []);
     } catch (err) {
       setTransactions([]);
@@ -115,7 +115,6 @@ const XRPZipWallet = () => {
     }
   };
 
-  // Chart
   useEffect(() => {
     if (!wallet) return;
     if (chartRef.current) chartRef.current.destroy();
@@ -129,7 +128,7 @@ const XRPZipWallet = () => {
     return () => chartRef.current?.destroy();
   }, [wallet]);
 
-  // FIRST VISIT
+  // LANDING PAGE
   if (!wallet) {
     return (
       <div style={{ background: ROYAL_BLUE, color: 'white', minHeight: '100vh', textAlign: 'center', paddingTop: '10%' }}>
@@ -171,7 +170,7 @@ const XRPZipWallet = () => {
     );
   }
 
-  // MAIN APP
+  // MAIN WALLET
   return (
     <div style={{ background: ROYAL_BLUE, color: 'white', minHeight: '100vh', fontFamily: 'Arial' }}>
       <div style={{ background: '#001133', padding: '15px', textAlign: 'center', borderBottom: '4px solid gold' }}>
@@ -229,7 +228,7 @@ const XRPZipWallet = () => {
         </div>
       )}
 
-               {/* HISTORY — FINAL, TESTED, BEAUTIFUL & WORKING */}
+      {/* HISTORY — FINAL WORKING */}
       {activeTab === 'History' && (
         <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
           <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3.5rem', marginBottom: '40px' }}>
@@ -237,26 +236,16 @@ const XRPZipWallet = () => {
           </h2>
 
           {transactions.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#888', fontSize: '1.4rem' }}>
-              No transactions yet
-            </p>
+            <p style={{ textAlign: 'center', color: '#888' }}>No transactions yet</p>
           ) : (
             transactions
-              .filter(item => {
-                const tx = item?.tx;
-                if (!tx || tx.TransactionType !== 'Payment') return false;
-                const amount = tx.Amount || item.meta?.DeliveredAmount;
-                if (!amount) return false;
-                if (typeof amount === 'string') return parseFloat(xrpl.dropsToXrp(amount)) > 0;
-                if (amount.value) return parseFloat(amount.value) > 0;
-                return false;
-              })
+              .filter(item => item.tx?.TransactionType === 'Payment')
               .map((item, i) => {
                 const tx = item.tx;
                 const meta = item.meta;
                 const isSent = tx.Account === wallet.classicAddress;
 
-                const rawAmount = isSent ? tx.Amount : (meta?.DeliveredAmount || tx.Amount);
+                const rawAmount = isSent ? tx.Amount : (meta?.DeliveredAmount || tx.Amount || '0');
                 let amountStr = '0 XRP';
                 if (typeof rawAmount === 'string') {
                   amountStr = parseFloat(xrpl.dropsToXrp(rawAmount)).toFixed(6) + ' XRP';
@@ -278,18 +267,17 @@ const XRPZipWallet = () => {
                       borderRadius: '20px',
                       margin: '15px 0',
                       border: '2px solid #333',
-                      overflow: 'hidden',
-                      boxShadow: '0 8px 20px rgba(0,0,0,0.4)'
+                      overflow: 'hidden'
                     }}
                   >
                     <div
                       style={{
-                        padding: '22px',
+                        padding: '20px',
                         cursor: 'pointer',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        background: isSent ? 'rgba(255,51,102,0.12)' : 'rgba(0,255,153,0.12)'
+                        background: isSent ? 'rgba(255,51,102,0.1)' : 'rgba(0,255,153,0.1)'
                       }}
                       onClick={() => {
                         const el = document.getElementById(`detail-${i}`);
@@ -297,27 +285,27 @@ const XRPZipWallet = () => {
                       }}
                     >
                       <div>
-                        <strong style={{ color: isSent ? '#ff3366' : '#00ff99', fontSize: '1.8rem' }}>
+                        <strong style={{ color: isSent ? '#ff3366' : '#00ff99', fontSize: '1.6rem' }}>
                           {isSent ? 'SENT' : 'RECEIVED'} {amountStr}
                         </strong>
                         <br />
-                        <span style={{ color: '#ccc', fontSize: '1.1rem' }}>
-                          {isSent ? 'To' : 'From'}: {counterparty.slice(0,12)}...{counterparty.slice(-8)}
+                        <span style={{ color: '#aaa', fontSize: '1rem' }}>
+                          {isSent ? 'To' : 'From'}: {counterparty.slice(0, 12)}...{counterparty.slice(-8)}
                         </span>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ color: GOLD, fontSize: '1.3rem', fontWeight: 'bold' }}>{date}</div>
-                        <div style={{ color: '#888', fontSize: '0.9rem' }}>Click for details ↓</div>
+                        <div style={{ color: GOLD, fontSize: '1.2rem' }}>{date}</div>
+                        <div style={{ color: '#666', fontSize: '0.9rem' }}>Click for details</div>
                       </div>
                     </div>
 
-                    <div id={`detail-${i}`} style={{ display: 'none', padding: '20px', background: '#000822', borderTop: '1px solid #444' }}>
+                    <div id={`detail-${i}`} style={{ display: 'none', padding: '20px', background: '#000822', borderTop: '1px solid #333' }}>
                       <p><strong>Hash:</strong><br />
                         <a href={`https://testnet.xrpl.org/transactions/${hash}`} target="_blank" rel="noopener noreferrer" style={{ color: GOLD }}>
                           {hash}
                         </a>
                       </p>
-                      <p><strong>Full Amount:</strong> {amountStr}</p>
+                      <p><strong>Amount:</strong> {amountStr}</p>
                       <p><strong>{isSent ? 'Recipient' : 'Sender'}:</strong> {counterparty}</p>
                     </div>
                   </motion.div>
