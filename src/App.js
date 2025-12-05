@@ -229,8 +229,7 @@ const XRPZipWallet = () => {
         </div>
       )}
 
-      {/* HISTORY — NOW SHOWS REAL AMOUNTS */}
-            {/* HISTORY — ONLY REAL PAYMENTS */}
+            {/* HISTORY — FINAL VERSION: SHOWS REAL TRANSACTIONS ONLY */}
       {activeTab === 'History' && (
         <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
           <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3.5rem', marginBottom: '40px' }}>
@@ -239,21 +238,38 @@ const XRPZipWallet = () => {
 
           {transactions.length === 0 ? (
             <p style={{ textAlign: 'center', color: '#888', fontSize: '1.4rem' }}>
-              No real transactions yet — send or receive XRP to see them here
+              No transactions found
             </p>
           ) : (
             transactions
               .filter(item => {
                 const tx = item?.tx;
-                // Only show real Payment transactions with real XRP amount
-                return tx?.TransactionType === 'Payment' && 
-                       typeof tx?.Amount === 'string' && 
-                       xrpl.dropsToXrp(tx.Amount) > 0;
+                // Only show real Payment transactions (not OfferCreate, AccountSet, etc.)
+                if (tx?.TransactionType !== 'Payment') return false;
+                // If Amount is string → it's XRP drops → convert and show if > 0
+                if (typeof tx.Amount === 'string') {
+                  const xrp = parseFloat(xrpl.dropsToXrp(tx.Amount));
+                  return xrp > 0;
+                }
+                // If Amount is object → it's an issued currency (USDC, BTC, etc.) → show all
+                if (typeof tx.Amount === 'object' && tx.Amount?.value) {
+                  return parseFloat(tx.Amount.value) > 0;
+                }
+                return false;
               })
               .map((item, i) => {
                 const tx = item.tx;
                 const isSent = tx.Account === wallet.classicAddress;
-                const amount = xrpl.dropsToXrp(tx.Amount);
+                let amountStr = '0 XRP';
+                let currency = 'XRP';
+
+                if (typeof tx.Amount === 'string') {
+                  amountStr = parseFloat(xrpl.dropsToXrp(tx.Amount)).toFixed(6) + ' XRP';
+                } else if (tx.Amount?.value) {
+                  amountStr = `${parseFloat(tx.Amount.value).toFixed(6)} ${tx.Amount.currency || 'IOU'}`;
+                  currency = tx.Amount.currency || 'IOU';
+                }
+
                 const counterparty = isSent ? tx.Destination : tx.Account;
                 const hash = item.hash;
                 const date = new Date((item.date || Date.now() / 1000) * 1000).toLocaleString();
@@ -286,12 +302,12 @@ const XRPZipWallet = () => {
                       }}
                     >
                       <div>
-                        <strong style={{ color: isSent ? '#ff3366' : '#00ff99', fontSize: '1.6rem' }}>
-                          {isSent ? 'SENT' : 'RECEIVED'} {parseFloat(amount).toFixed(6)} XRP
+                        <strong style={{ color: isSent ? '#ff3366' : '#00ff99', fontSize: '1.7rem' }}>
+                          {isSent ? 'SENT' : 'RECEIVED'} {amountStr}
                         </strong>
                         <br />
-                        <span style={{ color: '#aaa', fontSize: '1rem' }}>
-                          {isSent ? 'To' : 'From'}: {counterparty.slice(0,12)}...{counterparty.slice(-8)}
+                        <span style={{ color: '#aaa', fontSize: '1.1rem' }}>
+                          {isSent ? 'To' : 'From'}: {counterparty.slice(0, 12)}...{counterparty.slice(-8)}
                         </span>
                       </div>
                       <div style={{ textAlign: 'right' }}>
@@ -302,11 +318,11 @@ const XRPZipWallet = () => {
 
                     <div id={`detail-${i}`} style={{ display: 'none', padding: '20px', background: '#000822', borderTop: '1px solid #333' }}>
                       <p><strong>Hash:</strong><br />
-                        <a href={`https://testnet.xrpl.org/transactions/${hash}`} target="_blank" style={{ color: GOLD }}>
+                        <a href={`https://testnet.xrpl.org/transactions/${hash}`} target="_blank" rel="noopener noreferrer" style={{ color: GOLD }}>
                           {hash}
                         </a>
                       </p>
-                      <p><strong>Amount:</strong> {parseFloat(amount).toFixed(6)} XRP</p>
+                      <p><strong>Amount:</strong> {amountStr}</p>
                       <p><strong>{isSent ? 'Recipient' : 'Sender'}:</strong> {counterparty}</p>
                     </div>
                   </motion.div>
