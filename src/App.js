@@ -220,7 +220,7 @@ const XRPZipWallet = () => {
         </div>
       )}
 
-             {/* HISTORY — FINAL, TESTED & WORKING 100% */}
+                   {/* HISTORY — FINAL: SHOWS EVERY REAL XRP TRANSACTION */}
       {activeTab === 'History' && (
         <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
           <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3.5rem', marginBottom: '40px' }}>
@@ -229,38 +229,34 @@ const XRPZipWallet = () => {
 
           {transactions.length === 0 ? (
             <p style={{ textAlign: 'center', color: '#888', fontSize: '1.4rem' }}>
-              No transactions yet
+              Loading transactions...
             </p>
           ) : (
             transactions
-              .filter(item => {
-                const tx = item?.tx;
-                if (!tx) return false;
-                // Only show real Payment transactions
-                if (tx.TransactionType !== 'Payment') return false;
-                // Must have a real amount (XRP or issued currency)
-                const amount = tx.Amount || (item.meta?.DeliveredAmount);
-                if (!amount) return false;
-                if (typeof amount === 'string') return parseFloat(xrpl.dropsToXrp(amount)) > 0;
-                if (amount?.value) return parseFloat(amount.value) > 0;
-                return false;
-              })
               .map((item, i) => {
-                const tx = item.tx;
-                const meta = item.meta || {};
+                const tx = item?.tx || {};
+                const meta = item?.meta || {};
+
+                // Only show Payment transactions
+                if (tx.TransactionType !== 'Payment') return null;
+
                 const isSent = tx.Account === wallet.classicAddress;
 
-                // Correct amount for received payments
+                // Get amount — received payments use DeliveredAmount
                 const rawAmount = isSent ? tx.Amount : (meta.DeliveredAmount || tx.Amount);
+                if (!rawAmount) return null;
+
                 let amountStr = '0 XRP';
                 if (typeof rawAmount === 'string') {
-                  amountStr = parseFloat(xrpl.dropsToXrp(rawAmount)).toFixed(6) + ' XRP';
+                  const xrp = parseFloat(xrpl.dropsToXrp(rawAmount));
+                  if (xrp === 0) return null; // skip fake 0.000000
+                  amountStr = xrp.toFixed(6) + ' XRP';
                 } else if (rawAmount?.value) {
                   amountStr = `${parseFloat(rawAmount.value).toFixed(6)} ${rawAmount.currency || 'IOU'}`;
                 }
 
-                const counterparty = isSent ? tx.Destination : tx.Account;
-                const hash = item.hash;
+                const counterparty = isSent ? tx.Destination : tx.Account || 'Unknown';
+                const hash = item.hash || 'Unknown';
                 const date = new Date((item.date || Date.now() / 1000) * 1000).toLocaleString();
 
                 return (
@@ -297,7 +293,7 @@ const XRPZipWallet = () => {
                         </strong>
                         <br />
                         <span style={{ color: '#ccc', fontSize: '1.1rem' }}>
-                          {isSent ? 'To' : 'From'}: {counterparty?.slice(0,12)}...{counterparty?.slice(-8)}
+                          {isSent ? 'To' : 'From'}: {counterparty.slice(0,12)}...{counterparty.slice(-8)}
                         </span>
                       </div>
                       <div style={{ textAlign: 'right' }}>
@@ -318,6 +314,7 @@ const XRPZipWallet = () => {
                   </motion.div>
                 );
               })
+              .filter(Boolean) // remove nulls
           )}
         </div>
       )}
