@@ -250,23 +250,83 @@ const XRPZipWallet = () => {
 
       {/* HISTORY */}
       {activeTab === 'History' && (
-        <div style={{ padding: '40px' }}>
-          <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3rem' }}>TRANSACTION HISTORY</h2>
-          {transactions.length === 0 ? <p>No transactions yet</p> : (
-            <div>
-              {transactions.map((item, i) => {
-                const tx = item?.tx || {};
-                const amount = tx.Amount ? xrpl.dropsToXrp(tx.Amount) : '—';
-                return (
-                  <div key={i} style={{ background: '#001133', padding: '20px', margin: '10px 0', borderRadius: '15px', border: '1px solid gold' }}>
-                    <strong>{tx.TransactionType}</strong> — {amount} XRP → {tx.Destination?.slice(0,12)}...
-                  </div>
-                );
-              })}
+  <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
+    <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3.5rem', marginBottom: '40px' }}>
+      TRANSACTION HISTORY
+    </h2>
+
+    {transactions.length === 0 ? (
+      <p style={{ textAlign: 'center', color: '#888', fontSize: '1.4rem' }}>No transactions yet</p>
+    ) : (
+      transactions.map((item, i) => {
+        const tx = item?.tx || {};
+        const meta = item?.meta || {};
+        const isSent = tx.Account === wallet.classicAddress;
+        const amount = tx.Amount ? (typeof tx.Amount === 'string' ? xrpl.dropsToXrp(tx.Amount) : tx.Amount.value || '0') : '0';
+        const counterparty = isSent ? tx.Destination : tx.Account;
+        const hash = item.hash;
+        const date = new Date(item.date * 1000 || Date.now()).toLocaleString();
+
+        return (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: '#001133',
+              borderRadius: '20px',
+              margin: '15px 0',
+              border: '2px solid #333',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Summary Row */}
+            <div
+              style={{
+                padding: '20px',
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: isSent ? 'rgba(255,51,102,0.1)' : 'rgba(0,255,153,0.1)'
+              }}
+              onClick={() => {
+                const el = document.getElementById(`detail-${i}`);
+                el.style.display = el.style.display === 'block' ? 'none' : 'block';
+              }}
+            >
+              <div>
+                <strong style={{ color: isSent ? '#ff3366' : '#00ff99', fontSize: '1.6rem' }}>
+                  {isSent ? 'SENT' : 'RECEIVED'} {parseFloat(amount).toFixed(6)} XRP
+                </strong>
+                <br />
+                <span style={{ color: '#aaa', fontSize: '1rem' }}>
+                  {isSent ? 'To' : 'From'}: {counterparty?.slice(0, 12)}...{counterparty?.slice(-8)}
+                </span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: GOLD, fontSize: '1.2rem' }}>{date}</div>
+                <div style={{ color: '#666', fontSize: '0.9rem' }}>Click for details</div>
+              </div>
             </div>
-          )}
-        </div>
-      )}
+
+            {/* Expandable Details */}
+            <div id={`detail-${i}`} style={{ display: 'none', padding: '20px', background: '#000822', borderTop: '1px solid #333' }}>
+              <p><strong>Transaction Hash:</strong><br />
+                <a href={`https://testnet.xrpl.org/transactions/${hash}`} target="_blank" style={{ color: GOLD }}>
+                  {hash}
+                </a>
+              </p>
+              <p><strong>Full Amount:</strong> {amount} XRP</p>
+              <p><strong>{isSent ? 'Recipient' : 'Sender'}:</strong> {counterparty}</p>
+              <p><strong>Status:</strong> {meta.TransactionResult === 'tesSUCCESS' ? 'Success' : 'Failed'}</p>
+            </div>
+          </motion.div>
+        );
+      })
+    )}
+  </div>
+)}
 
       {/* RWA, NFT, BUY/SELL, NEWS – placeholders */}
       {['RWA', 'NFT', 'BUY/SELL Crypto', 'NEWS'].includes(activeTab) && (
