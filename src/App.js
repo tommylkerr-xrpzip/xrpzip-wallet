@@ -3,6 +3,7 @@ import * as xrpl from 'xrpl';
 import { motion } from 'framer-motion';
 import Chart from 'chart.js/auto';
 import { QRCodeCanvas } from 'qrcode.react';
+import TransactionHistory from "./TransactionHistory";
 
 const TABS = ['Dashboard', 'Receive', 'Send', 'History', 'RWA', 'NFT', 'BUY/SELL Crypto', 'NEWS'];
 
@@ -69,16 +70,19 @@ const XRPZipWallet = () => {
     }
   };
 
-  const getTransactions = async (addr) => {
-    const client = await getClient();
-    try {
-      const res = await client.request({ command: 'account_tx', account: addr, limit: 20 });
-      setTransactions(res.result.transactions || []);
-    } catch (err) {
-      setTransactions([]);
-    }
-  };
+  
 
+ const getTransactions = async (addr) => {
+  const client = await getClient();
+  try {
+    const res = await client.request({ command: 'account_tx', account: addr, limit: 20 });
+    console.log("Fetched transactions:", res.result.transactions); // 👈 added log
+    setTransactions(res.result.transactions || []);
+  } catch (err) {
+    console.error("Error fetching transactions:", err);
+    setTransactions([]);
+  }
+};
   const generateWallet = () => {
     const w = xrpl.Wallet.generate();
     setWallet(w);
@@ -180,158 +184,86 @@ const XRPZipWallet = () => {
     );
   }
 
-    return (
-      <div style={{ background: ROYAL_BLUE, color: 'white', minHeight: '100vh', fontFamily: 'Arial' }}>
-        <div style={{ background: '#001133', padding: '15px', textAlign: 'center', borderBottom: '4px solid gold' }}>
-          {TABS.map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                background: activeTab === tab ? GOLD : 'transparent',
-                color: activeTab === tab ? ROYAL_BLUE : 'white',
-                border: '2px solid gold',
-                padding: '12px 20px',
-                margin: '0 8px',
-                fontWeight: 'bold',
-                borderRadius: '10px'
-              }}
-            >
-              {tab.toUpperCase()}
-            </button>
-          ))}
-        </div>
-  
-        {activeTab === 'Dashboard' && (
-          <div style={{ padding: '60px', textAlign: 'center' }}>
-            <h1 style={{ fontSize: '6rem', color: GOLD }}>XRPZip</h1>
-            <p style={{ fontSize: '2.5rem' }}>Balance: <strong style={{ color: GOLD }}>{balance.toFixed(6)} XRP</strong></p>
-            <p style={{ fontSize: '2rem' }}>≈ ${(balance * xrpPrice).toFixed(2)} USD</p>
-            <canvas id="zipMeter" width="300" height="160"></canvas>
-          </div>
-        )}
-  
-        {activeTab === 'Receive' && (
-          <div style={{ padding: '80px', textAlign: 'center' }}>
-            <h2 style={{ color: GOLD, fontSize: '3.5rem' }}>RECEIVE XRP</h2>
-            <QRCodeCanvas value={wallet.classicAddress} size={240} bgColor="#000" fgColor="#fff" />
-            <p style={{ margin: '40px 0', wordBreak: 'break-all', fontSize: '1.4rem' }}>{wallet.classicAddress}</p>
-            <button onClick={() => copy(wallet.classicAddress)} style={{ background: GOLD, color: ROYAL_BLUE, padding: '15px 40px' }}>
-              Copy Address
-            </button>
-          </div>
-        )}
-  
-        {activeTab === 'Send' && (
-          <div style={{ padding: '60px', maxWidth: '600px', margin: '0 auto' }}>
-            <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3.5rem' }}>SEND XRP</h2>
-            <input placeholder="Recipient address" value={recipient} onChange={e => setRecipient(e.target.value)} style={{ width: '100%', padding: '16px', margin: '15px 0', background: '#001133', border: '2px solid gold', color: 'white', borderRadius: '12px' }} />
-            <input placeholder="Amount in XRP" value={sendAmount} onChange={e => setSendAmount(e.target.value)} style={{ width: '100%', padding: '16px', margin: '15px 0', background: '#001133', border: '2px solid gold', color: 'white', borderRadius: '12px' }} />
-            <motion.button whileTap={{ scale: 0.95 }} onClick={sendXRP} style={{ width: '100%', background: GOLD, color: ROYAL_BLUE, padding: '20px', fontSize: '1.8rem', fontWeight: 'bold', border: 'none', borderRadius: '15px', marginTop: '30px' }}>
-              SEND XRP
-            </motion.button>
-            <p style={{ marginTop: '30px', textAlign: 'center', fontSize: '1.4rem' }}>{txStatus}</p>
-          </div>
-        )}
-  
-        {/* HISTORY — FINAL FIXED VERSION */}
-        {activeTab === 'History' && (
-          <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
-            <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3.5rem', marginBottom: '40px' }}>
-              TRANSACTION HISTORY
-            </h2>
-  
-            {transactions.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#888', fontSize: '1.4rem' }}>
-                No transactions yet
-              </p>
-            ) : (
-              transactions
-                .map((item, i) => {
-                  const tx = item?.tx;
-                  const meta = item?.meta;
-  
-                  if (!tx) return null;
-  
-                  const isSent = tx.Account === wallet.classicAddress;
-  
-                  // Use DeliveredAmount for received, Amount for sent
-                  const rawAmount = isSent ? tx.Amount : (meta?.delivered_amount || tx.Amount);
-  
-                  let amountStr = '0 XRP';
-                  if (typeof rawAmount === 'string') {
-                    amountStr = parseFloat(xrpl.dropsToXrp(rawAmount)).toFixed(6) + ' XRP';
-                  } else if (rawAmount?.value) {
-                    amountStr = `${parseFloat(rawAmount.value).toFixed(6)} ${rawAmount.currency || 'IOU'}`;
-                  }
-  
-                  if (parseFloat(amountStr) === 0) return null; // skip 0.000000
-  
-                  const counterparty = isSent ? tx.Destination : tx.Account;
-  
-                  const hash = item.hash;
-                  const date = new Date((item.date || Date.now() / 1000) * 1000).toLocaleString();
-  
-                  return (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      style={{
-                        background: '#001133',
-                        borderRadius: '20px',
-                        margin: '15px 0',
-                        border: '2px solid #333',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      <div
-                        style={{
-                          padding: '20px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          background: isSent ? 'rgba(255,51,102,0.1)' : 'rgba(0,255,153,0.1)'
-                        }}
-                        onClick={() => {
-                          const el = document.getElementById(`detail-${i}`);
-                          el.style.display = el.style.display === 'block' ? 'none' : 'block';
-                        }}
-                      >
-                        <div>
-                          <strong style={{ color: isSent ? '#ff3366' : '#00ff99', fontSize: '1.6rem' }}>
-                            {isSent ? 'SENT' : 'RECEIVED'} {amountStr}
-                          </strong>
-                          <br />
-                          <span style={{ color: '#aaa', fontSize: '1rem' }}>
-                            {isSent ? 'To' : 'From'}: {counterparty?.slice(0,12)}...{counterparty?.slice(-8)}
-                          </span>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ color: GOLD, fontSize: '1.2rem' }}>{date}</div>
-                          <div style={{ color: '#666', fontSize: '0.9rem' }}>Click for details</div>
-                        </div>
-                      </div>
-  
-                      <div id={`detail-${i}`} style={{ display: 'none', padding: '20px', background: '#000822', borderTop: '1px solid #333' }}>
-                        <p><strong>Hash:</strong><br />
-                          <a href={`https://testnet.xrpl.org/transactions/${hash}`} target="_blank" style={{ color: GOLD }}>
-                            {hash}
-                          </a>
-                        </p>
-                        <p><strong>Amount:</strong> {amountStr}</p>
-                        <p><strong>{isSent ? 'Recipient' : 'Sender'}:</strong> {counterparty}</p>
-                      </div>
-                    </motion.div>
-                  );
-                })
-            )}
-          </div>
-        )}
-  
+   return (
+  <div style={{ background: ROYAL_BLUE, color: 'white', minHeight: '100vh', fontFamily: 'Arial' }}>
+    <div style={{ background: '#001133', padding: '15px', textAlign: 'center', borderBottom: '4px solid gold' }}>
+      {TABS.map(tab => (
+        <button
+          key={tab}
+          onClick={() => setActiveTab(tab)}
+          style={{
+            background: activeTab === tab ? GOLD : 'transparent',
+            color: activeTab === tab ? ROYAL_BLUE : 'white',
+            border: '2px solid gold',
+            padding: '12px 20px',
+            margin: '0 8px',
+            fontWeight: 'bold',
+            borderRadius: '10px'
+          }}
+        >
+          {tab.toUpperCase()}
+        </button>
+      ))}
+    </div>
+
+    {activeTab === 'Dashboard' && (
+      <div style={{ padding: '60px', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '6rem', color: GOLD }}>XRPZip</h1>
+        <p style={{ fontSize: '2.5rem' }}>
+          Balance: <strong style={{ color: GOLD }}>{balance.toFixed(6)} XRP</strong>
+        </p>
+        <p style={{ fontSize: '2rem' }}>≈ ${(balance * xrpPrice).toFixed(2)} USD</p>
+        <canvas id="zipMeter" width="300" height="160"></canvas>
       </div>
-    );
-  };
-  
-  export default XRPZipWallet;
+    )}
+
+    {activeTab === 'Receive' && (
+      <div style={{ padding: '80px', textAlign: 'center' }}>
+        <h2 style={{ color: GOLD, fontSize: '3.5rem' }}>RECEIVE XRP</h2>
+        <QRCodeCanvas value={wallet.classicAddress} size={240} bgColor="#000" fgColor="#fff" />
+        <p style={{ margin: '40px 0', wordBreak: 'break-all', fontSize: '1.4rem' }}>{wallet.classicAddress}</p>
+        <button
+          onClick={() => copy(wallet.classicAddress)}
+          style={{ background: GOLD, color: ROYAL_BLUE, padding: '15px 40px' }}
+        >
+          Copy Address
+        </button>
+      </div>
+    )}
+
+    {/* SEND */} 
+
+      {activeTab === 'Send' && ( 
+
+        <div style={{ padding: '60px', maxWidth: '600px', margin: '0 auto' }}> 
+
+          <h2 style={{ color: GOLD, textAlign: 'center', fontSize: '3.5rem' }}>SEND XRP</h2> 
+
+          <input placeholder="Recipient address" value={recipient} onChange={e => setRecipient(e.target.value)} style={{ width: '100%', padding: '16px', margin: '15px 0', background: '#001133', border: '2px solid gold', color: 'white', borderRadius: '12px' }} /> 
+
+          <input placeholder="Amount in XRP" value={sendAmount} onChange={e => setSendAmount(e.target.value)} style={{ width: '100%', padding: '16px', margin: '15px 0', background: '#001133', border: '2px solid gold', color: 'white', borderRadius: '12px' }} /> 
+
+          <motion.button whileTap={{ scale: 0.95 }} onClick={sendXRP} style={{ width: '100%', background: GOLD, color: ROYAL_BLUE, padding: '20px', fontSize: '1.8rem', fontWeight: 'bold', border: 'none', borderRadius: '15px', marginTop: '30px' }}> 
+
+            SEND XRP 
+
+          </motion.button> 
+
+          <p style={{ marginTop: '30px', textAlign: 'center', fontSize: '1.4rem' }}>{txStatus}</p> 
+
+        </div> 
+
+      )} 
+
+    {/* HISTORY TAB */}
+    <TransactionHistory
+  activeTab={activeTab}
+  transactions={transactions}
+  wallet={wallet}
+  xrpPrice={xrpPrice}
+/>
+  </div>
+);
+} // closes XRPZipWallet
+
+export default XRPZipWallet;
