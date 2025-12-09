@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import Chart from 'chart.js/auto';
 import { QRCodeCanvas } from 'qrcode.react';
 import TransactionHistory from "./TransactionHistory";
+import NFTTab from "./NFTTab";
 
 const TABS = ['Dashboard', 'Receive', 'Send', 'History', 'RWA', 'NFT', 'BUY/SELL Crypto', 'NEWS'];
 
@@ -262,8 +263,20 @@ const XRPZipWallet = () => {
   wallet={wallet}
   xrpPrice={xrpPrice}
 />
+
+{/* NFT TAB */}
+    {activeTab === 'NFT' && (
+      <NFTTab wallet={wallet} />
+    )}
+
+
   </div>
+
+  
 );
+
+
+
 } // closes XRPZipWallet
 
 export default XRPZipWallet;
